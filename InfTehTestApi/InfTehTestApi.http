@@ -1,0 +1,6 @@
+@InfTehTestApi_HostAddress = http://localhost:5001
+
+GET {{InfTehTestApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
