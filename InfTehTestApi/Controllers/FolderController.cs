@@ -1,7 +1,9 @@
 ﻿using InfTehTestApi.DB;
 using InfTehTestApi.Models;
+using InfTehTestApi.ViewModel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.ObjectModel;
 
 namespace InfTehTestApi.Controllers
 {
@@ -28,20 +30,20 @@ namespace InfTehTestApi.Controllers
             var folder1 = new Folder
             {
                 FolderName = "folder1",
-                ParentFolderId = 1,
+                FolderId = 1,
             };
             var folder2 = new Folder
             {
                 FolderName = "folder2",
-                ParentFolderId = 1,
+                FolderId = 1,
             };
 
-            _context.Folders.AddRange(folder1, folder2);
+            _context.Folders.AddRange(baseFolder, folder1, folder2);
             await _context.SaveChangesAsync();
 
             var folder3 = new Folder
             {
-                ParentFolderId = folder1.Id,
+                FolderId = folder1.Id,
                 FolderName = "folder3"
             };
 
@@ -51,12 +53,12 @@ namespace InfTehTestApi.Controllers
             var fileType1 = new FileType
             {
                 TypeName = "txt",
-                Icon = "stub"
+                Icon = "\\file.png"
             };
             var fileType2 = new FileType
             {
                 TypeName = "docx",
-                Icon = "stub"
+                Icon = "\\file.png"
             };
 
             _context.FileTypes.AddRange(fileType1, fileType2);
@@ -94,40 +96,111 @@ namespace InfTehTestApi.Controllers
             return Ok();
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<List<Folder>>> GetFolders(int parentFolderId = 1)
-        {
-            var folders = await _context.Folders.Where(f => f.ParentFolderId == parentFolderId)
-                                                .ToListAsync();
+    
 
-            return Ok(folders);
+        [HttpGet]
+        public async Task<ActionResult<List<FolderViewModel>>> GetFolders(int parentFolderId = 1)
+        {
+            //var folders = await _context.Folders
+            //    .Where(f => f.FolderId == parentFolderId)
+            //    .Select(f => new FolderViewModel
+            //    {
+            //        Id = f.Id,
+            //        Name = f.FolderName,
+            //        ParentFolderId = f.FolderId,
+            //        Child = f.Files.Select(file => new FolderFileViewModel
+            //        {
+            //            Id = file.Id,
+            //            Name = file.FileName,
+            //            Description = file.Description,
+            //            FileTypeId = file.FileTypeId,
+            //            FileTypeName = file.FileType.TypeName,
+            //            Icon = file.FileType.Icon,
+            //            FolderId = file.FolderId
+            //        }).ToList()
+            //    })
+            //    .ToListAsync();
+            return Ok();//folders);
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<List<FolderFile>>> GetFiles(int folderId = 1)
+        [HttpGet("{folderId}")]
+        public async Task<ActionResult<FolderFileViewModel>> GetFolderContent(int folderId = 1)
         {
-            var files = await _context.FolderFiles.Where(f => f.FolderId == folderId)
-                                                  .Include(t => t.FileType)
-                                                  .Select(f => new FolderFile
-                                                  {
-                                                      Id = f.Id,
-                                                      FileName = f.FileName,
-                                                      Description = f.Description,
-                                                      FileTypeId = f.FileTypeId,
-                                                      FileType = f.FileType,
-                                                      FolderId = f.FolderId,
-                                                      //Content = f.Content, //Пробуем не перегружать систему коллекцией тяжелых файлов
-                                                  })
-                                                  .ToListAsync();
+            var content = await _context.Folders.Where(f => f.Id == folderId)
+                                                .Include(f => f.Folders)
+                                                .Include(f => f.Files)
+                                                .ThenInclude(f => f.FileType)
+                                                .Select(f => new TreeViewVM
+                                                {
+                                                    Id = f.Id,
+                                                    Name = f.FolderName,
+                                                    TypeId = 0,
+                                                    Child = new ObservableCollection<TreeViewVM>(new List<TreeViewVM>().Concat( 
+                                                    f.Files.Select(file => new TreeViewVM
+                                                    {
+                                                        Id = file.Id,
+                                                        TypeId = file.FileTypeId,
+                                                        Name = file.FileName,
+                                                        Description = file.Description,
+                                                        TypeName = file.FileType.TypeName,
+                                                        Icon = file.FileType.Icon,
+                                                        FolderId = file.FolderId,
+                                                    }).ToList()).Concat(
+                                                     f.Folders.Select(subFolder => new TreeViewVM
+                                                    {
+                                                        Id = subFolder.Id,
+                                                        TypeId = 0,
+                                                        Name = subFolder.FolderName,
+                                                        Icon = "\\folder.png",
+                                                        FolderId = folderId,
+                                                    }).ToList()))
+                                                }).FirstOrDefaultAsync();
 
+            return  Ok(content);
+        }
+
+        [HttpGet("{folderId}")]
+        public async Task<ActionResult<List<FolderFileViewModel>>> GetFiles(int folderId = 1)
+        {
+            var files = await _context.FolderFiles
+                .Where(f => f.FolderId == folderId)
+                .Include(f => f.FileType)
+                .Select(f => new FolderFileViewModel
+                {
+                    Id = f.Id,
+                    Name = f.FileName,
+                    Description = f.Description,
+                    FileTypeId = f.FileTypeId,
+                    FileTypeName = f.FileType.TypeName,
+                    Icon = f.FileType.Icon,
+                    FolderId = f.FolderId
+                })
+                .ToListAsync();
             return Ok(files);
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<FolderFile>> GetFileContent(int fileId)
+        [HttpGet("{fileId}")]
+        public async Task<ActionResult<FolderFileViewModel>> GetFileContent(int fileId)
         {
-            var file = await _context.FolderFiles.Where(f => f.Id == fileId)
-                                                 .FirstOrDefaultAsync();
+            var file = await _context.FolderFiles
+                .Where(f => f.Id == fileId)
+                .Include(f => f.FileType)
+                .Select(f => new TreeViewVM
+                {
+                    Id = f.Id,
+                    Name = f.FileName,
+                    Description = f.Description,
+                    TypeId = f.FileTypeId,
+                    TypeName = f.FileType.TypeName,
+                    Icon = f.FileType.Icon,
+                    Content = f.Content
+                })
+                .FirstOrDefaultAsync();
+
+            if (file == null)
+            {
+                return NotFound();
+            }
 
             return Ok(file);
         }
@@ -137,58 +210,66 @@ namespace InfTehTestApi.Controllers
         {
             await _context.FolderFiles.AddAsync(file);
             await _context.SaveChangesAsync();
-
             return CreatedAtAction(nameof(GetFileContent), new { id = file.Id }, file);
         }
+
         [HttpPost]
-        public async Task<ActionResult<FolderFile>> AddFolder(Folder folder)
+        public async Task<ActionResult<Folder>> AddFolder(Folder folder)
         {
             await _context.Folders.AddAsync(folder);
             await _context.SaveChangesAsync();
-
-            return Ok();//TODO createdataction
+            return CreatedAtAction(nameof(GetFolders), new { id = folder.Id }, folder);
         }
-        [HttpPost]
-        public async Task<ActionResult<FolderFile>> AddFileType(FileType ft)
+
+        [HttpPost("filetype")]
+        public async Task<ActionResult<FileType>> AddFileType(FileType fileType)
         {
-            await _context.FileTypes.AddAsync(ft);
+            await _context.FileTypes.AddAsync(fileType);
             await _context.SaveChangesAsync();
-
-            return Ok();//TODO createdataction
+            return CreatedAtAction(nameof(GetFolders), new { id = fileType.Id }, fileType);
         }
-        [HttpPut("{id}")]
+
+        [HttpPut("file/{id}")]
         public async Task<IActionResult> UpdateFile(int id, FolderFile file)
         {
+            if (id != file.Id)
+            {
+                return BadRequest();
+            }
+
             _context.Entry(file).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-
             return NoContent();
         }
-        [HttpPut("{id}")]
+
+        [HttpPut("folder/{id}")]
         public async Task<IActionResult> UpdateFolder(int id, Folder folder)
         {
+            if (id != folder.Id)
+            {
+                return BadRequest();
+            }
+
             _context.Entry(folder).State = EntityState.Modified;
             await _context.SaveChangesAsync();
-
             return NoContent();
         }
-        
-        [HttpDelete("{id}")]
+
+        [HttpDelete("file/{id}")]
         public async Task<IActionResult> DeleteFile(int id)
         {
             var file = await _context.FolderFiles.FindAsync(id);
-            if(file == null)
+            if (file == null)
             {
                 return NotFound();
             }
 
-
             _context.FolderFiles.Remove(file);
             await _context.SaveChangesAsync();
-
             return Ok();
         }
-        [HttpDelete("{id}")]
+
+        [HttpDelete("folder/{id}")]
         public async Task<IActionResult> DeleteFolder(int id)
         {
             var folder = await _context.Folders.FindAsync(id);
@@ -199,7 +280,6 @@ namespace InfTehTestApi.Controllers
 
             _context.Folders.Remove(folder);
             await _context.SaveChangesAsync();
-
             return Ok();
         }
     }
