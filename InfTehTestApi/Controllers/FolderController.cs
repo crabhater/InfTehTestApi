@@ -146,7 +146,7 @@ namespace InfTehTestApi.Controllers
                                                         Icon = file.FileType.Icon,
                                                         FolderId = file.FolderId,
                                                     }).ToList()).Concat(
-                                                     f.Folders.Select(subFolder => new TreeViewVM
+                                                    f.Folders.Select(subFolder => new TreeViewVM
                                                     {
                                                         Id = subFolder.Id,
                                                         TypeId = 0,
@@ -206,17 +206,29 @@ namespace InfTehTestApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<FolderFile>> AddFile(FolderFile file)
+        public async Task<ActionResult<TreeViewVM>> AddFile(TreeViewVM file)
         {
-            await _context.FolderFiles.AddAsync(file);
+            var newFile = new FolderFile
+            {
+                FolderId = file.FolderId,
+                FileName = file.Name,
+                FileTypeId = file.TypeId,
+                Content = file.Content
+            };
+            await _context.FolderFiles.AddAsync(newFile);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetFileContent), new { id = file.Id }, file);
+            return Ok();//CreatedAtAction(nameof(GetFileContent), new { id = file.Id }, file);
         }
 
         [HttpPost]
-        public async Task<ActionResult<Folder>> AddFolder(Folder folder)
+        public async Task<ActionResult<TreeViewVM>> AddFolder(TreeViewVM folder)
         {
-            await _context.Folders.AddAsync(folder);
+            var newFolder = new Folder()
+            {
+                FolderId = folder.FolderId,
+                FolderName = folder.Name,
+            };
+            await _context.Folders.AddAsync(newFolder);
             await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetFolders), new { id = folder.Id }, folder);
         }
@@ -229,20 +241,30 @@ namespace InfTehTestApi.Controllers
             return CreatedAtAction(nameof(GetFolders), new { id = fileType.Id }, fileType);
         }
 
-        [HttpPut("file/{id}")]
-        public async Task<IActionResult> UpdateFile(int id, FolderFile file)
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateFile(int id, TreeViewVM file)
         {
             if (id != file.Id)
             {
                 return BadRequest();
             }
 
-            _context.Entry(file).State = EntityState.Modified;
+            var newFile = new FolderFile()
+            {
+                FileName = file.Name,
+                Id = file.Id,
+                FolderId = file.FolderId,
+                FileTypeId = file.TypeId,
+                Content = file.Content,
+                Description = file.Description,
+            };
+
+            _context.Entry(newFile).State = EntityState.Modified;
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        [HttpPut("folder/{id}")]
+        [HttpPut("{id}")]
         public async Task<IActionResult> UpdateFolder(int id, Folder folder)
         {
             if (id != folder.Id)
@@ -255,7 +277,7 @@ namespace InfTehTestApi.Controllers
             return NoContent();
         }
 
-        [HttpDelete("file/{id}")]
+        [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFile(int id)
         {
             var file = await _context.FolderFiles.FindAsync(id);
@@ -269,7 +291,7 @@ namespace InfTehTestApi.Controllers
             return Ok();
         }
 
-        [HttpDelete("folder/{id}")]
+        [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteFolder(int id)
         {
             var folder = await _context.Folders.FindAsync(id);
