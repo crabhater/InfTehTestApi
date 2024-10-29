@@ -9,7 +9,7 @@ namespace InfTehTestApi.Models
         public string? Description { get; set; }
         public int? FileTypeId { get; set; }
         public FileType FileType { get; set; }
-        public int FolderId { get; set; }
+        public int? FolderId { get; set; }
         public string? Content { get; set; }
     }
 }

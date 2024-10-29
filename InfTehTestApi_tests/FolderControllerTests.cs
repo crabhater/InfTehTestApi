@@ -28,31 +28,87 @@ namespace InfTehTestApi_tests
         }
 
         [Fact]
-        public async Task GetFolders_ReturnsListOfFolders()
+        public async Task GetFolderFiles_ReturnsListOfFoldersWithFiles()
         {
             _context.Database.EnsureDeleted();
             _context.Database.EnsureCreated();
             // Arrange
+            var basefolder = new Folder
+            {
+                FolderName = "base"
+            };
+            _context.Folders.Add(basefolder);
+            await _context.SaveChangesAsync();
+
             var folder1 = new Folder
             {
                 FolderName = "folder1",
-                ParentFolderId = 1,
+                FolderId = basefolder.Id,
+            };
+            _context.Folders.Add(folder1);
+            await _context.SaveChangesAsync();
+
+            var file1 = new FolderFile
+            {
+                FileName = "file1",
+                FolderId = folder1.Id
+            };
+            var file2 = new FolderFile
+            {
+                FileName = "file2",
+                FolderId = folder1.Id
+            };
+            _context.FolderFiles.AddRange(file1, file2);
+            await _context.SaveChangesAsync();
+
+
+
+            // Act
+            var result = await _controller.GetFolderFiles(folder1.Id);
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var returnValue = Assert.IsType<List<IBaseVm>>(okResult.Value);
+            Assert.Equal(2, returnValue.Count);
+        }
+
+        [Fact]
+        public async Task GetFolderFolders_ReturnsListOfFoldersWithInnerFolders()
+        {
+            _context.Database.EnsureDeleted();
+            _context.Database.EnsureCreated();
+            // Arrange
+
+            // Arrange
+            var basefolder = new Folder
+            {
+                FolderName = "base"
+            };
+            _context.Folders.Add(basefolder);
+            await _context.SaveChangesAsync();
+
+
+
+            var folder1 = new Folder
+            {
+                FolderName = "folder1",
+                FolderId = basefolder.Id,
             };
             var folder2 = new Folder
             {
                 FolderName = "folder2",
-                ParentFolderId = 1,
+                FolderId = basefolder.Id,
             };
 
             _context.Folders.AddRange(folder1, folder2);
             await _context.SaveChangesAsync();
 
             // Act
-            var result = await _controller.GetFolders();
+            var result = await _controller.GetFolderFolders(basefolder.Id);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnValue = Assert.IsType<List<FolderViewModel>>(okResult.Value);
+            var returnValue = Assert.IsType<List<IBaseVm>>(okResult.Value);
             Assert.Equal(2, returnValue.Count);
         }
 
